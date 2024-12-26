@@ -107,13 +107,102 @@ def is_valid_url(url: str) -> bool:
     url_pattern = r"^(http:\/\/www\.|https:\/\/www\.|http:\/\/|https:\/\/)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}"
     return re.match(url_pattern, url) is not None
 
+def scroll_to_load_more(page, required_items, max_scrolls=10):
+    """
+    Scroll the Google Maps results panel to load more listings using XPath in JavaScript.
+    Stops scrolling as soon as the required number of items is reached or max scrolls are exhausted.
+    """
+    try:
+        # Locate the results panel using XPath
+        results_panel_xpath = '//div[contains(@aria-label, "Results for")]'
+
+        # Evaluate XPath and locate the results panel
+        results_panel = page.evaluate('''
+            (xpath) => {
+                const panel = document.evaluate(
+                    xpath,
+                    document,
+                    null,
+                    XPathResult.FIRST_ORDERED_NODE_TYPE,
+                    null
+                ).singleNodeValue;
+                return panel ? panel : null;
+            }
+        ''', results_panel_xpath)
+
+        if not results_panel:
+            print("Results panel not found.")
+            return
+
+        previous_count = 0
+        scroll_count = 0
+
+        while scroll_count < max_scrolls:
+            # Count the current number of listings
+            current_count = len(page.locator('//a[contains(@href, "https://www.google.com/maps/place")]').all())
+            print(f"Scrolling... Current count: {current_count}")
+
+            # Stop if the required number of items is reached
+            if current_count >= required_items:
+                print(f"Required items ({required_items}) reached after {scroll_count} scrolls.")
+                break
+
+            # Stop if no new results are loaded
+            if current_count == previous_count:
+                print(f"Scrolling stopped after {scroll_count} scrolls, total listings loaded: {current_count}")
+                break
+
+            # Update the previous count
+            previous_count = current_count
+
+            # Perform JavaScript scrolling using XPath
+            scrolled = page.evaluate('''
+                (xpath) => {
+                    const panel = document.evaluate(
+                        xpath,
+                        document,
+                        null,
+                        XPathResult.FIRST_ORDERED_NODE_TYPE,
+                        null
+                    ).singleNodeValue;
+                    if (panel) {
+                        panel.scrollTop += 2000;
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+            ''', results_panel_xpath)
+
+            if not scrolled:
+                print("Unable to scroll - panel not found or undefined.")
+                break
+
+            # Wait for results to load
+            page.wait_for_timeout(2000)
+
+            # Increment scroll count
+            scroll_count += 1
+
+        # If max scrolls are reached but required items are not met
+        if scroll_count >= max_scrolls and current_count < required_items:
+            print(f"Maximum scroll limit ({max_scrolls}) reached. Only {current_count}/{required_items} items loaded.")
+
+        print(f"Final listing count: {current_count}")
+
+    except Exception as e:
+        print(f"Error during scrolling: {e}")
+
+
+
+
 # --------------------------------
 # Main Function
 # --------------------------------
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", "--search", type=str)
-    parser.add_argument("-t", "--total", type=int)
+    parser.add_argument("-t", "--total", type=int, default=10) #default is 10 shops for now
     args = parser.parse_args()
 
     search_list = [args.search] if args.search else []
@@ -146,8 +235,11 @@ def main():
             page.keyboard.press("Enter")
             page.wait_for_timeout(5000)
 
+            scroll_to_load_more(page,required_items=args.total, max_scrolls=10)  # Ensure all listings are loaded
             page.hover('//a[contains(@href, "https://www.google.com/maps/place")]')
+            #print('before breakpoint start')
             listings = page.locator('//a[contains(@href, "https://www.google.com/maps/place")]').all()[:total]
+            print('b4 go one level of in DOM')
             listings = [listing.locator("xpath=..") for listing in listings]
             business_list = BusinessList()
 
