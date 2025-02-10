@@ -5,6 +5,8 @@
 -Navigate to the Cloned Repository:
 `cd e-scraper`
 -Make sure you enter the correct credential in config.json file. This should be provided by your proxy provider.
+-installing requirements.txt 
+`pip install -r requirements.txt`
 
 
 
