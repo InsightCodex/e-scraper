@@ -6,7 +6,8 @@
 `cd e-scraper`
 --Make sure you enter the correct credential in config.json file. This should be provided by your proxy provider.
 --installing requirements.txt 
-```python3 -m venv venv
+```
+python3 -m venv venv
 source venv/bin/activate  # For Linux/Mac
 venv\Scripts\activate     # For Windows
 pip install -r requirements.txt
